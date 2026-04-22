@@ -4,6 +4,11 @@ ai/**/__pycache__/
 ai/**/*.pyc
 ai/.env
 
+# Python (myaimentor-ai/)
+myaimentor-ai/.venv/
+myaimentor-ai/**/__pycache__/
+myaimentor-ai/**/*.pyc
+
 # Spring (spring/)
 spring/build/
 spring/.gradle/
