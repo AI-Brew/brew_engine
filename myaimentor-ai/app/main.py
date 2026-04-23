@@ -1,10 +1,23 @@
-﻿from fastapi import FastAPI, Depends
+from contextlib import asynccontextmanager
+
+from fastapi import Depends, FastAPI
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.db import get_db
+from app.db import Base, engine, get_db
+from app import models  # noqa: F401
+from app.routers import knowledge
 
-app = FastAPI(title="My AI Mentor Studio - AI Service")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    Base.metadata.create_all(bind=engine)
+    yield
+
+
+app = FastAPI(title="My AI Mentor Studio - AI Service", lifespan=lifespan)
+
+app.include_router(knowledge.router)
 
 
 @app.get("/")
