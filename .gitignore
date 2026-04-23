@@ -38,5 +38,4 @@ Thumbs.db
 # Env / Secrets (전역 커버 - .env 어디 있든 무시)
 .env
 .env.*
-!.env.example
 *.log
