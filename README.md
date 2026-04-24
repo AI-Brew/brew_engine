@@ -1,2 +1,2 @@
-# myaimentor-backend
-AI 자소서 백엔드 서버 입니다.
+# myaimentor-AI
+AI 자소서 AI 서버 입니다.
