@@ -4,6 +4,11 @@ ai/**/__pycache__/
 ai/**/*.pyc
 ai/.env
 
+# Python (myaimentor-ai/)
+myaimentor-ai/.venv/
+myaimentor-ai/**/__pycache__/
+myaimentor-ai/**/*.pyc
+
 # Spring (spring/)
 spring/build/
 spring/.gradle/
@@ -33,5 +38,4 @@ Thumbs.db
 # Env / Secrets (전역 커버 - .env 어디 있든 무시)
 .env
 .env.*
-!.env.example
 *.log
