@@ -12,13 +12,20 @@ from pydantic import BaseModel, ConfigDict, Field
 # provider 타입. 여기에 새 provider 추가하면 전체 시스템이 지원.
 Provider = Literal["openai", "gemini"]
 
+# 청킹 분할 방식
+ChunkSplitter = Literal["recursive", "sentence", "paragraph", "fixed"]
+
 
 # ===== Knowledge =====
 
 class KnowledgeCreate(BaseModel):
     bot_id: int = Field(..., gt=0, description="Bot ID")
-    content: str = Field(..., min_length=1, description="Knowledge content")
+    content: str = Field(..., min_length=1, description="Knowledge content (chunked before save)")
     provider: Provider = Field(..., description="LLM provider for embedding")
+    # 청킹 설정 — Spring 봇 설정에서 전달. 기본값은 권장 표준.
+    chunk_size: Optional[int] = Field(500, ge=100, le=2000, description="Max chars per chunk")
+    chunk_overlap: Optional[int] = Field(100, ge=0, le=500, description="Overlap chars between chunks")
+    chunk_splitter: Optional[ChunkSplitter] = Field("recursive", description="Chunking strategy")
 
 
 class KnowledgeResponse(BaseModel):
@@ -30,6 +37,25 @@ class KnowledgeResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ChunkOut(BaseModel):
+    index: int
+    text: str
+
+
+class KnowledgePreviewRequest(BaseModel):
+    content: str = Field(..., min_length=1)
+    chunk_size: Optional[int] = Field(500, ge=100, le=2000)
+    chunk_overlap: Optional[int] = Field(100, ge=0, le=500)
+    chunk_splitter: Optional[ChunkSplitter] = Field("recursive")
+
+
+class KnowledgePreviewResponse(BaseModel):
+    chunks: List[ChunkOut]
+    chunk_size: int
+    chunk_overlap: int
+    splitter: str
 
 
 # ===== Bot Vectors =====

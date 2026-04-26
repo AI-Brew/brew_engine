@@ -1,6 +1,7 @@
 """지식 관리 라우터.
 
 provider에 따라 bot_knowledge_openai / bot_knowledge_gemini 테이블로 분기.
+등록 시 봇 설정의 청킹 파라미터로 텍스트를 분할해 청크별 1 row 로 저장한다.
 """
 
 from typing import List
@@ -10,7 +11,15 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.models import PROVIDER_MODELS
-from app.schemas import KnowledgeCreate, KnowledgeResponse, Provider
+from app.schemas import (
+    ChunkOut,
+    KnowledgeCreate,
+    KnowledgePreviewRequest,
+    KnowledgePreviewResponse,
+    KnowledgeResponse,
+    Provider,
+)
+from app.services.chunker import chunk_text
 from app.services.embedding_service import create_embedding
 
 router = APIRouter(tags=["knowledge"])
@@ -37,27 +46,64 @@ def _to_response(k, provider: str) -> KnowledgeResponse:
 
 @router.post(
     "/knowledge",
-    response_model=KnowledgeResponse,
+    response_model=List[KnowledgeResponse],
     status_code=201,
-    summary="지식 등록 (+ 벡터 자동 생성)",
+    summary="지식 등록 (청크별 분할 + 벡터 자동 생성)",
     description=(
-        "봇의 지식을 등록한다. provider에 따라 임베딩 차원이 다르고,\n"
-        "별도 테이블에 저장된다 (openai=1536차원, gemini=768차원).\n"
-        "같은 bot_id라도 provider가 다르면 서로 다른 레코드로 관리된다."
+        "받은 content 를 봇 설정의 청킹 파라미터로 분할 후, 청크별로 1 row 저장한다.\n"
+        "응답은 생성된 청크 리스트 (각 청크가 별도의 KnowledgeResponse)."
     ),
 )
 def create_knowledge(payload: KnowledgeCreate, db: Session = Depends(get_db)):
     KnowledgeModel = _get_knowledge_model(payload.provider)
-    vector = create_embedding(payload.content, payload.provider)
-    knowledge = KnowledgeModel(
-        bot_id=payload.bot_id,
-        content=payload.content,
-        embedding=vector,
+
+    # 1) 청킹
+    chunks = chunk_text(
+        payload.content,
+        chunk_size=payload.chunk_size or 500,
+        chunk_overlap=payload.chunk_overlap or 100,
+        splitter=payload.chunk_splitter or "recursive",
     )
-    db.add(knowledge)
+    if not chunks:
+        raise HTTPException(status_code=400, detail="No chunks produced from content")
+
+    # 2) 청크별 임베딩 + 저장
+    saved = []
+    for chunk in chunks:
+        vector = create_embedding(chunk, payload.provider)
+        knowledge = KnowledgeModel(
+            bot_id=payload.bot_id,
+            content=chunk,
+            embedding=vector,
+        )
+        db.add(knowledge)
+        saved.append(knowledge)
     db.commit()
-    db.refresh(knowledge)
-    return _to_response(knowledge, payload.provider)
+    for k in saved:
+        db.refresh(k)
+    return [_to_response(k, payload.provider) for k in saved]
+
+
+@router.post(
+    "/knowledge/preview",
+    response_model=KnowledgePreviewResponse,
+    summary="청킹 미리보기 (저장 없음)",
+    description=(
+        "등록 시 사용되는 동일한 청킹 함수를 호출해 분할 결과만 반환한다. DB 저장 X.\n"
+        "프론트가 라이브 미리보기에 활용."
+    ),
+)
+def preview_knowledge(payload: KnowledgePreviewRequest):
+    size = payload.chunk_size or 500
+    overlap = payload.chunk_overlap or 100
+    splitter = payload.chunk_splitter or "recursive"
+    chunks = chunk_text(payload.content, size, overlap, splitter)
+    return KnowledgePreviewResponse(
+        chunks=[ChunkOut(index=i, text=t) for i, t in enumerate(chunks)],
+        chunk_size=size,
+        chunk_overlap=overlap,
+        splitter=splitter,
+    )
 
 
 @router.get(

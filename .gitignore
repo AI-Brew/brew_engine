@@ -4,7 +4,12 @@ ai/**/__pycache__/
 ai/**/*.pyc
 ai/.env
 
-# Python (myaimentor-ai/)
+# Python (루트 평탄화 후 — 현재 구조)
+.venv/
+**/__pycache__/
+**/*.pyc
+
+# Python (myaimentor-ai/) — 옛 구조 잔여
 myaimentor-ai/.venv/
 myaimentor-ai/**/__pycache__/
 myaimentor-ai/**/*.pyc
